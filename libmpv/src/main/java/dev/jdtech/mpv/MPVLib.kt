@@ -1,13 +1,16 @@
 package dev.jdtech.mpv
 
 import android.content.Context
+import android.util.Log
 import android.view.Surface
+import java.util.concurrent.CopyOnWriteArrayList
 
 @Suppress("unused")
 class MPVLib private constructor(nativePtr: Long) {
     private var nativeInstance: Long = 0
-    private val observers = mutableListOf<EventObserver>()
-    private val logObservers = mutableListOf<LogObserver>()
+    // Copy-on-write so observers may add or remove observers from inside a callback.
+    private val observers = CopyOnWriteArrayList<EventObserver>()
+    private val logObservers = CopyOnWriteArrayList<LogObserver>()
 
     companion object {
         init {
@@ -67,11 +70,17 @@ class MPVLib private constructor(nativePtr: Long) {
     }
     private external fun nativeDetachSurface(instance: Long)
 
+    /** Runs an mpv command. Use [commandWithResult] to get the mpv error code. */
     fun command(cmd: Array<String>) {
-        checkCreated()
-        nativeCommand(nativeInstance, cmd)
+        commandWithResult(cmd)
     }
-    private external fun nativeCommand(instance: Long, cmd: Array<String>)
+
+    /** Runs an mpv command and returns the mpv error code (0 on success, negative on failure). */
+    fun commandWithResult(cmd: Array<String>): Int {
+        checkCreated()
+        return nativeCommand(nativeInstance, cmd)
+    }
+    private external fun nativeCommand(instance: Long, cmd: Array<String>): Int
 
     /**
      * Sets the minimum level of mpv log messages delivered to [LogObserver]s
@@ -92,11 +101,19 @@ class MPVLib private constructor(nativePtr: Long) {
     }
     private external fun nativeSetOptionString(instance: Long, name: String, value: String): Int
 
+    /** Reads an int64 property truncated to 32 bits (kept for compatibility); use [getPropertyLong] for the full value. */
     fun getPropertyInt(property: String): Int? {
         checkCreated()
         return nativeGetPropertyInt(nativeInstance, property)
     }
     private external fun nativeGetPropertyInt(instance: Long, property: String): Int?
+
+    /** Reads an int64 property without truncation. */
+    fun getPropertyLong(property: String): Long? {
+        checkCreated()
+        return nativeGetPropertyLong(nativeInstance, property)
+    }
+    private external fun nativeGetPropertyLong(instance: Long, property: String): Long?
 
     fun setPropertyInt(property: String, value: Int) {
         checkCreated()
@@ -147,97 +164,72 @@ class MPVLib private constructor(nativePtr: Long) {
     private external fun nativeObserveProperty(instance: Long, property: String, format: Int)
 
     fun addObserver(o: EventObserver) {
-        synchronized(observers) {
-            observers.add(o)
-        }
+        observers.add(o)
     }
 
     fun removeObserver(o: EventObserver) {
-        synchronized(observers) {
-            observers.remove(o)
-        }
-    }
-
-    fun event(eventId: Int) {
-        synchronized(observers) {
-            for (o in observers)
-                o.event(eventId)
-        }
-    }
-
-    fun eventEndFile(reason: Int, error: Int) {
-        synchronized(observers) {
-            for (o in observers)
-                o.eventEndFile(reason, error)
-        }
-    }
-
-    fun eventProperty(property: String) {
-        synchronized(observers) {
-            for (o in observers)
-                o.eventProperty(property)
-        }
+        observers.remove(o)
     }
 
     fun eventProperty(property: String, value: Long) {
-        synchronized(observers) {
-            for (o in observers)
-                o.eventProperty(property, value)
-        }
+        dispatch(observers, "eventProperty") { o -> o.eventProperty(property, value) }
     }
 
     fun eventProperty(property: String, value: Double) {
-        synchronized(observers) {
-            for (o in observers)
-                o.eventProperty(property, value)
-        }
+        dispatch(observers, "eventProperty") { o -> o.eventProperty(property, value) }
     }
 
     fun eventProperty(property: String, value: Boolean) {
-        synchronized(observers) {
-            for (o in observers)
-                o.eventProperty(property, value)
-        }
+        dispatch(observers, "eventProperty") { o -> o.eventProperty(property, value) }
     }
 
     fun eventProperty(property: String, value: String) {
-        synchronized(observers) {
-            for (o in observers)
-                o.eventProperty(property, value)
-        }
+        dispatch(observers, "eventProperty") { o -> o.eventProperty(property, value) }
+    }
+
+    fun eventProperty(property: String) {
+        dispatch(observers, "eventProperty") { o -> o.eventProperty(property) }
+    }
+
+    fun event(eventId: Int) {
+        dispatch(observers, "event") { o -> o.event(eventId) }
     }
 
     fun addLogObserver(o: LogObserver) {
-        synchronized(logObservers) {
-            logObservers.add(o)
-        }
+        logObservers.add(o)
     }
 
     fun removeLogObserver(o: LogObserver) {
-        synchronized(logObservers) {
-            logObservers.remove(o)
-        }
+        logObservers.remove(o)
     }
 
     fun logMessage(prefix: String, level: Int, text: String) {
-        synchronized(logObservers) {
-            for (o in logObservers)
-                o.logMessage(prefix, level, text)
+        dispatch(logObservers, "logMessage") { o -> o.logMessage(prefix, level, text) }
+    }
+
+    // Calls every observer even if one of them throws, so a faulty observer
+    // cannot stop delivery to the ones registered after it.
+    private inline fun <T> dispatch(targets: Iterable<T>, callback: String, call: (T) -> Unit) {
+        for (o in targets) {
+            try {
+                call(o)
+            } catch (e: Exception) {
+                Log.e("mpv", "Observer ${o?.javaClass?.name} threw in $callback", e)
+            }
         }
     }
 
     interface EventObserver {
-        fun event(eventId: Int) {}
-        fun eventEndFile(reason: Int, error: Int) {}
-        fun eventProperty(property: String) {}
-        fun eventProperty(property: String, value: Long) {}
-        fun eventProperty(property: String, value: Double) {}
-        fun eventProperty(property: String, value: Boolean) {}
-        fun eventProperty(property: String, value: String) {}
+        fun eventProperty(property: String)
+        fun eventProperty(property: String, value: Long)
+        fun eventProperty(property: String, value: Double)
+        fun eventProperty(property: String, value: Boolean)
+        fun eventProperty(property: String, value: String)
+        fun event(eventId: Int)
     }
 
     interface LogObserver {
-        fun logMessage(prefix: String, level: Int, text: String) {}
+        fun logMessage(prefix: String, level: Int, text: String)
     }
 
     object MpvFormat {
@@ -251,14 +243,6 @@ class MPVLib private constructor(nativePtr: Long) {
         const val MPV_FORMAT_NODE_ARRAY: Int = 7
         const val MPV_FORMAT_NODE_MAP: Int = 8
         const val MPV_FORMAT_BYTE_ARRAY: Int = 9
-    }
-
-    object MpvEndFileReason {
-        const val MPV_END_FILE_REASON_EOF: Int = 0
-        const val MPV_END_FILE_REASON_STOP: Int = 2
-        const val MPV_END_FILE_REASON_QUIT: Int = 3
-        const val MPV_END_FILE_REASON_ERROR: Int = 4
-        const val MPV_END_FILE_REASON_REDIRECT: Int = 5
     }
 
     object MpvEvent {
@@ -294,29 +278,5 @@ class MPVLib private constructor(nativePtr: Long) {
         const val MPV_LOG_LEVEL_V: Int = 50
         const val MPV_LOG_LEVEL_DEBUG: Int = 60
         const val MPV_LOG_LEVEL_TRACE: Int = 70
-    }
-
-    object MpvError {
-        const val MPV_ERROR_SUCCESS: Int = 0
-        const val MPV_ERROR_EVENT_QUEUE_FULL: Int = -1
-        const val MPV_ERROR_NOMEM: Int = -2
-        const val MPV_ERROR_UNINITIALIZED: Int = -3
-        const val MPV_ERROR_INVALID_PARAMETER: Int = -4
-        const val MPV_ERROR_OPTION_NOT_FOUND: Int = -5
-        const val MPV_ERROR_OPTION_FORMAT: Int = -6
-        const val MPV_ERROR_OPTION_ERROR: Int = -7
-        const val MPV_ERROR_PROPERTY_NOT_FOUND: Int = -8
-        const val MPV_ERROR_PROPERTY_FORMAT: Int = -9
-        const val MPV_ERROR_PROPERTY_UNAVAILABLE: Int = -10
-        const val MPV_ERROR_PROPERTY_ERROR: Int = -11
-        const val MPV_ERROR_COMMAND: Int = -12
-        const val MPV_ERROR_LOADING_FAILED: Int = -13
-        const val MPV_ERROR_AO_INIT_FAILED: Int = -14
-        const val MPV_ERROR_VO_INIT_FAILED: Int = -15
-        const val MPV_ERROR_NOTHING_TO_PLAY: Int = -16
-        const val MPV_ERROR_UNKNOWN_FORMAT: Int = -17
-        const val MPV_ERROR_UNSUPPORTED: Int = -18
-        const val MPV_ERROR_NOT_IMPLEMENTED: Int = -19
-        const val MPV_ERROR_GENERIC: Int = -20
     }
 }
