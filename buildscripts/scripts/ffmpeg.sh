@@ -31,6 +31,7 @@ cpuflags=
 	--disable-static --enable-shared --enable-{gpl,version3} \
 	--disable-{stripping,doc,programs} \
 	--disable-{muxers,encoders,devices,filters} \
+	--enable-filter=dynaudnorm,pan,volume,equalizer,acompressor,loudnorm,aresample,aformat,anull,channelsplit,channelcombine,join \
 	--disable-v4l2-m2m
 
 make -j$cores
