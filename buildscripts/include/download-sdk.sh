@@ -4,7 +4,7 @@
 
 . ./include/path.sh # load $os var
 
-[ -z "$IN_CI" ] && TRAVIS=0 # skip steps not required for CI?
+[ -z "$IN_CI" ] && IN_CI=0 # skip steps not required for CI?
 [ -z "$WGET" ] && WGET=wget # possibility of calling wget differently
 
 if [ "$os" == "linux" ]; then
@@ -14,10 +14,11 @@ if [ "$os" == "linux" ]; then
 			python3-pip python3-setuptools unzip wget gperf;
 			python3 -m pip install meson jsonschema jinja2; }
 		apt-get -v &>/dev/null && {
-		    sudo apt-get update;
+			sudo apt-get update;
 			sudo apt-get install -y autoconf pkg-config libtool ninja-build nasm \
-			python3-pip python3-setuptools unzip python3-jinja2; }
-			python -m pip install meson
+			python3-pip python3-setuptools unzip python3-jinja2 gperf wget;
+			python3 -m pip install meson ||
+				python3 -m pip install --break-system-packages meson; }
 	fi
 
 	if ! javac -version &>/dev/null; then
@@ -55,32 +56,20 @@ if [ ! -d "android-sdk-${os}" ]; then
 	unzip -q -d "android-sdk-${os}" "commandlinetools-${os}-${v_sdk}.zip"
 	rm "commandlinetools-${os}-${v_sdk}.zip"
 fi
-sdk_install () {
-	local exe="./android-sdk-$os/cmdline-tools/latest/bin/android"
-	[ -x "$exe" ] || exe="./android-sdk-$os/cmdline-tools/bin/android"
-	if [ -x "$exe" ]; then
-		"$exe" --no-metrics --sdk="${ANDROID_HOME}" sdk install \
-			"platforms/${v_platform}" \
-			"build-tools/${v_sdk_build_tools}" \
-			"ndk/${v_ndk}" \
-			"cmake/${v_cmake}"
-		return
-	fi
-
-	# Fall back to the legacy sdkmanager (e.g. the preinstalled SDK on CI runners)
-	exe="./android-sdk-$os/cmdline-tools/latest/bin/sdkmanager"
+sdkmanager () {
+	local exe="./android-sdk-$os/cmdline-tools/latest/bin/sdkmanager"
 	[ -x "$exe" ] || exe="./android-sdk-$os/cmdline-tools/bin/sdkmanager"
-	echo y | "$exe" --sdk_root="${ANDROID_HOME}" \
-		"platforms;${v_platform}" \
-		"build-tools;${v_sdk_build_tools}" \
-		"ndk;${v_ndk}" \
-		"cmake;${v_cmake}"
+	"$exe" --sdk_root="${ANDROID_HOME}" "$@"
 }
-sdk_install
+echo y | sdkmanager \
+	"platforms;${v_platform}" \
+	"build-tools;${v_sdk_build_tools}" \
+	"ndk;${v_ndk}" \
+	"cmake;${v_cmake}"
 
 # gas-preprocessor
 mkdir -p bin
-$WGET "https://github.com/FFmpeg/gas-preprocessor/raw/master/gas-preprocessor.pl" \
+$WGET "https://github.com/FFmpeg/gas-preprocessor/raw/${v_gas_preprocessor}/gas-preprocessor.pl" \
 	-O bin/gas-preprocessor.pl
 chmod +x bin/gas-preprocessor.pl
 
