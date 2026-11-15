@@ -58,17 +58,18 @@ mavenPublishing {
         )
     )
 
+    // The version comes from the tag: publish.yaml passes -PVERSION_NAME=<tag without the v>.
     coordinates(
-        groupId = "dev.jdtech.mpv",
+        groupId = "io.github.cd16d",
         artifactId = "libmpv",
-        version = "1.1.0"
+        version = providers.gradleProperty("VERSION_NAME").getOrElse("1.1.0-filters")
     )
 
     pom {
         name = "libmpv-android"
-        description = "libmpv for Android"
+        description = "libmpv for Android (Cd16d fork with FFmpeg audio filters)"
         inceptionYear = "2023"
-        url = "https://github.com/jarnedemeulemeester/libmpv-android"
+        url = "https://github.com/Cd16d/libmpv-android"
         licenses {
             license {
                 name = "GNU General Public License v3.0 or later"
@@ -77,19 +78,25 @@ mavenPublishing {
         }
         developers {
             developer {
+                id = "Cd16d"
+                name = "Cd16d"
+                url = "https://github.com/Cd16d"
+            }
+            developer {
                 id = "jarnedemeulemeester"
                 name = "Jarne Demeulemeester"
                 email = "jarnedemeulemeester@gmail.com"
+                roles.add("original author")
             }
         }
         scm {
-            url = "https://github.com/jarnedemeulemeester/libmpv-android.git"
-            connection = "scm:git@github.com:jarnedemeulemeester/libmpv-android.git"
-            developerConnection = "scm:git@github.com:jarnedemeulemeester/libmpv-android.git"
+            url = "https://github.com/Cd16d/libmpv-android"
+            connection = "scm:git:https://github.com/Cd16d/libmpv-android.git"
+            developerConnection = "scm:git:ssh://git@github.com/Cd16d/libmpv-android.git"
         }
         issueManagement {
             system = "GitHub"
-            url = "https://github.com/jarnedemeulemeester/libmpv-android/issues"
+            url = "https://github.com/Cd16d/libmpv-android/issues"
         }
     }
 }

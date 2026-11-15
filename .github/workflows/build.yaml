@@ -5,6 +5,14 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -39,6 +47,7 @@ jobs:
         working-directory: ./buildscripts
         env:
           IN_CI: 1
+          WGET: wget --tries=5 --waitretry=10 --retry-connrefused --retry-on-host-error
         run: ./download.sh
 
       - name: Apply patches
@@ -48,6 +57,9 @@ jobs:
       - name: Build
         working-directory: ./buildscripts
         run: ./build.sh
+
+      - name: Check AAR
+        run: ./buildscripts/check-aar.sh
 
       - uses: actions/upload-artifact@v7
         with:
