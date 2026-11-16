@@ -62,7 +62,7 @@ mavenPublishing {
     coordinates(
         groupId = "io.github.cd16d",
         artifactId = "libmpv",
-        version = providers.gradleProperty("VERSION_NAME").getOrElse("1.1.0-filters.1")
+        version = providers.gradleProperty("VERSION_NAME").getOrElse("1.1.0-filters.2")
     )
 
     pom {
