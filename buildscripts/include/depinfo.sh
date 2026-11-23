@@ -11,16 +11,16 @@ v_cmake=4.1.2
 v_lua=5.2.4
 v_libunibreak=8_0
 v_libass=0.17.5
-v_harfbuzz=15.1.0
+v_harfbuzz=15.2.0
 v_fribidi=1.0.18
 v_freetype=2-15-0
 v_libxml2=2.15.4
-v_fontconfig=2.18.3
-v_mbedtls=3.6.7
+v_fontconfig=2.18.4
+v_mbedtls=3.6.8
 v_libplacebo=7.387.0
-v_dav1d=1.5.4
-v_ffmpeg=9.0.2
-v_curl=8_23_0
+v_dav1d=1.5.5
+v_ffmpeg=9.1
+v_curl=8.23.0
 v_mpv=0.42.0
 
 # Pinned commit of FFmpeg/gas-preprocessor (used by download-sdk.sh)
